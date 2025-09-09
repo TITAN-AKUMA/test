@@ -5,241 +5,213 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>LaserQR — Indian Railways Track Fittings (Auth)</title>
   <style>
-    /* --- Indian Rail theme colors --- */
     :root{
       --rail-maroon:#8b0000;
       --rail-saffron:#ff8c00;
       --rail-cream:#fff7ec;
-      --accent:#36454f; /* dark slate */
-      --glass: rgba(255,255,255,0.08);
+      --accent:#36454f;
       --card-radius:20px;
-      --shadow: 0 10px 30px rgba(0,0,0,0.15);
-      --glass2: rgba(255,255,255,0.06);
+      --shadow:0 10px 30px rgba(0,0,0,0.15);
     }
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui}
+    body{margin:0;background:linear-gradient(180deg,var(--rail-cream),#f2efe9,#efeef0)}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+    .panel{width:880px;max-width:96vw;height:640px;border-radius:28px;overflow:hidden;
+      display:flex;background:linear-gradient(135deg,rgba(139,0,0,0.08),rgba(255,140,0,0.02));
+      box-shadow:var(--shadow)}
+    .aside{width:280px;min-width:240px;background:linear-gradient(180deg,var(--rail-maroon),#6f0000);
+      color:var(--rail-cream);padding:28px;display:flex;flex-direction:column;justify-content:space-between}
+    .aside h1{margin:0;font-size:22px}
+    .aside p{margin:8px 0 0 0;font-size:14px}
+    .area{flex:1;padding:28px;display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,0.6);backdrop-filter:blur(4px)}
+    .tabs{display:flex;gap:12px}
+    .tab{padding:8px 14px;border-radius:14px;cursor:pointer;font-weight:600;color:var(--accent);
+      border:2px solid transparent;transition:.3s}
+    .tab.active{background:var(--rail-cream);border-color:var(--rail-saffron)}
+    .cards-wrap{position:relative;overflow:hidden;max-width:500px;margin:auto;flex:1;display:flex;align-items:center}
+    .cards{display:flex;transition:transform .45s cubic-bezier(.2,.9,.2,1)}
+    .card{width:500px;max-width:90%;background:#fff;border-radius:var(--card-radius);padding:20px;
+      box-shadow:0 12px 30px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:12px;
+      overflow-y:auto;max-height:500px}
+    @media(max-width:600px){.card{width:230px;max-height:420px}}
+    label{font-size:13px;font-weight:600;margin-bottom:6px;display:block}
+    input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #ccc}
+    .btn{padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;border:none}
+    .btn-primary{background:var(--rail-maroon);color:white}
+    .btn-ghost{background:transparent;border:2px solid var(--rail-maroon);color:var(--rail-maroon)}
 
-    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
-    html,body{height:100%;margin:0;background:
-      linear-gradient(180deg,var(--rail-cream) 0%, #f2efe9 50%, #efeef0 100%);
-      color:var(--accent);
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: -350px;
+      min-width: 250px;
+      max-width: 300px;
+      padding: 14px 18px;
+      background: #fff;
+      border-left: 6px solid var(--rail-maroon);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      border-radius: 12px;
+      font-size: 14px;
+      color: #333;
+      transition: all 0.5s ease;
+      z-index: 9999;
     }
-
-    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;}
-
-    .panel {
-      width:880px;max-width:96vw;height:640px;border-radius:28px;overflow:hidden;
-      display:flex; background:linear-gradient(135deg, rgba(139,0,0,0.08), rgba(255,140,0,0.02));
-      box-shadow: var(--shadow);position:relative;
-    }
-
-    /* left decorative rail side */
-    .aside {
-      width:320px;min-width:240px;
-      background: linear-gradient(180deg,var(--rail-maroon), #6f0000);
-      color:var(--rail-cream);padding:28px;
-      display:flex;flex-direction:column;justify-content:space-between;gap:12px;
-    }
-    .aside .brand{display:flex;gap:12px;align-items:center;}
-    .logo {width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,var(--rail-cream), rgba(255,255,255,0.2));
-      display:flex;align-items:center;justify-content:center;box-shadow: 0 4px 10px rgba(0,0,0,0.2) inset;}
-    .logo svg{width:40px;height:40px;fill:var(--rail-maroon); transform: rotate(8deg);}
-    .aside h1{margin:0;font-size:20px;letter-spacing:0.6px}
-    .aside p{margin:0;opacity:0.9}
-    .rail-pattern{height:220px;
-      background:repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 6px, transparent 6px 12px),
-                 linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
-      border-radius:12px;margin-top:8px;padding:12px;font-size:13px;}
-
-    /* right interactive area */
-    .area {flex:1; padding:28px; display:flex; flex-direction:column; gap:12px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.3));
-      backdrop-filter: blur(4px);}
-
-    .toggle-row { display:flex; gap:12px; align-items:center; justify-content:space-between; }
-    .tabs { display:flex; gap:8px; }
-    .tab {
-      padding:8px 14px; border-radius:14px; cursor:pointer;
-      font-weight:600; color:var(--accent); background:transparent; border:2px solid transparent;
-      transition: all .28s ease;
-    }
-    .tab.active { background:var(--rail-cream); border-color:var(--rail-saffron); box-shadow:0 6px 18px rgba(0,0,0,0.06)}
-
-    /* swipe container */
-    .cards-wrap {position:relative;overflow:hidden;flex:1;border-radius:16px;
-      display:flex;align-items:center;justify-content:flex-start;
-      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.95));
-      padding:18px;}
-    .cards {display:flex;gap:18px;transition: transform .45s cubic-bezier(.2,.9,.2,1);will-change:transform;}
-    .card {
-      width:360px;min-width:300px;background:linear-gradient(180deg,#ffffff, #fbfbfb);
-      border-radius:var(--card-radius);padding:20px;box-shadow: 0 12px 30px rgba(0,0,0,0.06);
-      display:flex;flex-direction:column;gap:12px;position:relative;
-    }
-
-    .card .card-logo { width:60px;height:60px;border-radius:12px;background:var(--glass);
-      display:flex;align-items:center;justify-content:center;}
-    .card h2{margin:6px 0 0 0}
-    .card p {margin:0; font-size:13px; opacity:0.8}
-
-    /* form elements */
-    label{font-size:13px;font-weight:600;color:var(--accent); display:block; margin-bottom:6px}
-    input[type="text"], input[type="email"], input[type="password"], select {
-      width:100%; padding:12px 14px; border-radius:10px; border:1px solid #e6e6e6;
-      font-size:14px; background:white;
-    }
-    .small { font-size:13px; color:#666; margin-top:6px}
-    .row { display:flex; gap:10px; }
-    .row .col { flex:1; }
-
-    .btn {display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px;
-      border:none; cursor:pointer; font-weight:700;}
-    .btn-primary { background:var(--rail-maroon); color:var(--rail-cream); }
-    .btn-ghost { background:transparent; border:2px solid var(--rail-maroon); color:var(--rail-maroon) }
-    .btn-reject { background:#eee; color:#444; }
-
-    .hint { font-size:13px; color:#8b8b8b; margin-top:8px; }
-    .role-badge {display:inline-block; padding:6px 10px; border-radius:999px; background:var(--glass2); font-weight:700;}
-    .status {font-size:13px; padding:8px 10px; border-radius:8px; background:rgba(0,0,0,0.03);}
-    .message { margin-top:8px; font-size:13px; color:#b00020; }
-
-    /* responsive */
-    @media (max-width:860px){
-      .panel{flex-direction:column;height:auto}
-      .aside{width:100%;min-width:unset;height:160px;border-radius:0 0 20px 20px}
-      .area{padding:16px}
-      .cards-wrap{padding:12px}
-    }
+    .toast.show { right: 20px; }
+    .toast.success { border-left-color: green; }
+    .toast.error { border-left-color: red; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="panel">
-      <!-- Left Aside -->
-      <div class="aside">
-        <div>
-          <div class="bran">
-            <div class="logo">
-              <svg viewBox="0 0 24 24"><path d="M12 2C7.03 2 3 6.03 3 11s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 2a7 7 0 110 14 7 7 0 010-14zm0 2a5 5 0 100 10 5 5 0 000-10z"/><circle cx="12" cy="11" r="2.2"/></svg>
-            </div>
-            <div>
-              <h1>LaserQR — Track Fittings</h1>
-              <p>Indian Railways — Track hardware traceability & inspections</p>
-            </div>
-          </div>
-          <div class="rail-pattern" style="margin-top:18px">
-            <strong>Why this?</strong>
-            <p style="margin-top:8px">Laser-QR marking + unified web system for vendor, supply & inspection tracking. Fast scans, audit trail, and AI-assisted defect flags.</p>
-          </div>
-        </div>
-        <div style="font-size:13px;opacity:0.95">
-          <strong>Theme</strong>
-          <div style="margin-top:6px">Colors inspired from Indian Railways. Offline-first scanning, secure sync with UDM/TMS (later).</div>
-        </div>
+<div class="wrap">
+  <div class="panel">
+    <!-- Aside -->
+    <div class="aside">
+      <div>
+        <h1>LaserQR</h1>
+        <p>Indian Railways — Track hardware traceability</p>
       </div>
+      <small>Colors inspired from Indian Railways. Secure UDM/TMS sync later.</small>
+    </div>
 
-      <!-- Right Area -->
-      <div class="area">
-        <div class="toggle-row">
-          <div class="tabs">
-            <div id="tab-signin" class="tab active">Sign In</div>
-            <div id="tab-signup" class="tab">Sign Up</div>
+    <!-- Right Area -->
+    <div class="area">
+      <div class="tabs">
+        <div id="tab-signin" class="tab active">Sign In</div>
+        <div id="tab-signup" class="tab">Sign Up</div>
+      </div>
+      <div class="cards-wrap">
+        <div class="cards" id="cards">
+          <!-- Sign In -->
+          <div class="card">
+            <h2>Welcome back</h2>
+            <label>Email</label>
+            <input id="signin-email" type="email" placeholder="Enter your email">
+            <label>Password</label>
+            <input id="signin-pass" type="password" placeholder="••••••••">
+            <button id="btnSignIn" class="btn btn-primary">Sign In</button>
+            <button id="btnResetPass" class="btn btn-ghost">Forgot Password?</button>
+            <button id="btnSignOut" class="btn btn-ghost" style="display:none">Sign Out</button>
           </div>
-          <div class="status">Role: <span class="role-badge" id="curRole">—</span></div>
-        </div>
 
-        <div class="cards-wrap" id="cardsWrap">
-          <div class="cards" id="cards">
-            <!-- Sign In -->
-            <div class="card">
-              <h2>Welcome back</h2>
-              <label>Email</label>
-              <input id="signin-email" type="email" placeholder="you@vendor.com"/>
-              <div class="small">Role: <span id="liveRole">—</span></div>
-              <label>Password</label>
-              <input id="signin-pass" type="password" placeholder="••••••••"/>
-              <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-                <button id="btnSignIn" class="btn btn-primary">Sign In</button>
-                <button id="btnSignOut" class="btn btn-ghost" style="display:none">Sign Out</button>
-                <div id="signin-msg" class="message"></div>
-              </div>
+          <!-- Sign Up -->
+          <div class="card">
+            <h2>Create account</h2>
+            <label>Role</label>
+            <select id="signup-role">
+              <option value="" disabled selected>-- choose role --</option>
+              <option value="vendor">Vendor</option>
+              <option value="inspection_officer">Inspection Officer</option>
+              <option value="officer">Railway Officer</option>
+            </select>
+            <div id="name-row" style="display:none">
+              <label>Name</label>
+              <input id="signup-name" type="text" placeholder="Full name (for vendor)">
             </div>
-
-            <!-- Sign Up -->
-            <div class="card">
-              <h2>Create account</h2>
-              <label for="signup-role">Select role</label>
-              <select id="signup-role">
-                <option value="" disabled selected>-- choose role --</option>
-                <option value="vendor">Vendor</option>
-                <option value="inspection_officer">Inspection Officer</option>
-                <option value="officer">Officer</option>
-              </select>
-              <div id="name-row" style="display:none">
-                <label>Name</label>
-                <input id="signup-name" type="text" placeholder="Full name (vendor)"/>
-              </div>
-              <label>Email</label>
-              <input id="signup-email" type="email" placeholder="you@domain.com"/>
-              <div class="row">
-                <div class="col"><label>Password</label><input id="signup-pass" type="password"/></div>
-                <div class="col"><label>Confirm</label><input id="signup-pass2" type="password"/></div>
-              </div>
-              <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-                <button id="btnSignUp" class="btn btn-primary">Create Account</button>
-                <button id="btnReject" class="btn btn-reject">Reject</button>
-                <div id="signup-msg" class="message"></div>
-              </div>
-            </div>
+            <label>Email</label>
+            <input id="signup-email" type="email" placeholder="Enter email">
+            <label>Password</label>
+            <input id="signup-pass" type="password">
+            <label>Confirm Password</label>
+            <input id="signup-pass2" type="password">
+            <button id="btnSignUp" class="btn btn-primary">Create Account</button>
           </div>
         </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+<!-- Toast container -->
+<div id="toast" class="toast"></div>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
-      authDomain: "laserqr-fd4fa.firebaseapp.com",
-      databaseURL: "https://laserqr-fd4fa-default-rtdb.firebaseio.com",
-      projectId: "laserqr-fd4fa",
-      storageBucket: "laserqr-fd4fa.firebasestorage.app",
-      messagingSenderId: "191584527271",
-      appId: "1:191584527271:web:71dad945fa1b18c0024c82",
-      measurementId: "G-88ZMKEZT24"
-    };
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendEmailVerification, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-    const cards = document.getElementById("cards");
-    let cardIndex = 0;
-    const updateCardsPos = () => { cards.style.transform = `translateX(${-cardIndex * 378}px)`; };
-    document.getElementById("tab-signin").onclick=()=>{cardIndex=0;updateCardsPos();}
-    document.getElementById("tab-signup").onclick=()=>{cardIndex=1;updateCardsPos();}
+const firebaseConfig = {
+  apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
+  authDomain: "laserqr-fd4fa.firebaseapp.com",
+  databaseURL: "https://laserqr-fd4fa-default-rtdb.firebaseio.com",
+  projectId: "laserqr-fd4fa",
+  storageBucket: "laserqr-fd4fa.firebasestorage.app",
+  messagingSenderId: "191584527271",
+  appId: "1:191584527271:web:71dad945fa1b18c0024c82",
+  measurementId: "G-88ZMKEZT24"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
-    const signupRole=document.getElementById("signup-role");
-    const nameRow=document.getElementById("name-row");
-    const signupName=document.getElementById("signup-name");
-    signupRole.onchange=()=>{ if(signupRole.value==="vendor"){nameRow.style.display="block";}else{ nameRow.style.display="none"; signupName.value=signupRole.value; } };
+// Toast function
+function showToast(msg,type="info"){
+  const toast=document.getElementById("toast");
+  toast.textContent=msg;
+  toast.className="toast show "+(type==="error"?"error":"success");
+  setTimeout(()=>toast.classList.remove("show"),4000);
+}
 
-    const safeKey=email=>email.replace(/\./g,",").toLowerCase();
-    document.getElementById("btnSignUp").onclick=async()=>{
-      const role=signupRole.value,email=document.getElementById("signup-email").value,pass=document.getElementById("signup-pass").value,pass2=document.getElementById("signup-pass2").value,name=signupName.value;
-      if(pass!==pass2)return;
-      const cred=await createUserWithEmailAndPassword(auth,email,pass);
-      await set(ref(db,"users/"+cred.user.uid),{email,role,name});
-      await set(ref(db,"emails/"+safeKey(email)),{role,name});
-      alert("Account created!"); cardIndex=0; updateCardsPos();
-    };
-    document.getElementById("btnSignIn").onclick=async()=>{
-      const email=document.getElementById("signin-email").value,pass=document.getElementById("signin-pass").value;
-      await signInWithEmailAndPassword(auth,email,pass);alert("Signed In!");
-    };
-    document.getElementById("btnSignOut").onclick=()=>signOut(auth);
-  </script>
+// Tabs
+const cards = document.getElementById("cards");
+let cardIndex = 0;
+const updateCardsPos = ()=>{ cards.style.transform=`translateX(${-cardIndex*500}px)` };
+document.getElementById("tab-signin").onclick=()=>{cardIndex=0;updateCardsPos();document.getElementById("tab-signin").classList.add("active");document.getElementById("tab-signup").classList.remove("active");}
+document.getElementById("tab-signup").onclick=()=>{cardIndex=1;updateCardsPos();document.getElementById("tab-signup").classList.add("active");document.getElementById("tab-signin").classList.remove("active");}
+
+// Role field logic
+const signupRole=document.getElementById("signup-role");
+const nameRow=document.getElementById("name-row");
+signupRole.onchange=()=>{ nameRow.style.display = (signupRole.value==="vendor")?"block":"none"; };
+
+// Sign Up
+document.getElementById("btnSignUp").onclick=async()=>{
+  const role=signupRole.value, email=document.getElementById("signup-email").value, pass=document.getElementById("signup-pass").value, pass2=document.getElementById("signup-pass2").value, name=document.getElementById("signup-name").value;
+  if(!role||!email||!pass||!pass2){return showToast("All fields are required","error");}
+  if(pass!==pass2){return showToast("Passwords do not match","error");}
+  try{
+    const cred=await createUserWithEmailAndPassword(auth,email,pass);
+    await set(ref(db,"users/"+cred.user.uid),{email,role,name: role==="vendor"?name:role});
+    await sendEmailVerification(cred.user);
+    showToast("Account created! Check your email for verification.","success");
+    cardIndex=0;updateCardsPos();
+  }catch(err){showToast("Error: "+err.message,"error");}
+};
+
+// Sign In
+document.getElementById("btnSignIn").onclick=async()=>{
+  const email=document.getElementById("signin-email").value, pass=document.getElementById("signin-pass").value;
+  try{
+    const cred=await signInWithEmailAndPassword(auth,email,pass);
+    if(!cred.user.emailVerified){
+      showToast("Please verify your email before signing in.","error");
+      await signOut(auth);
+      return;
+    }
+    const snap=await get(child(ref(db),"users/"+cred.user.uid));
+    if(snap.exists()){
+      const role=snap.val().role;
+      if(role==="vendor") window.location.href="vendor.html";
+      else if(role==="inspection_officer") window.location.href="inspection.html";
+      else if(role==="officer") window.location.href="officer.html";
+      else showToast("Unknown role in database.","error");
+    }
+  }catch(err){showToast("Error: "+err.message,"error");}
+};
+
+// Password Reset
+document.getElementById("btnResetPass").onclick=async()=>{
+  const email=document.getElementById("signin-email").value;
+  if(!email) return showToast("Enter your email above first.","error");
+  try{
+    await sendPasswordResetEmail(auth,email);
+    showToast("Password reset link sent to "+email,"success");
+  }catch(err){showToast("Error: "+err.message,"error");}
+};
+
+// Sign Out
+document.getElementById("btnSignOut").onclick=()=>signOut(auth).then(()=>showToast("Signed out","success"));
+</script>
 </body>
 </html>

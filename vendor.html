@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaserQR — Vendor Dashboard</title>
+<style>
+body{font-family:Inter,ui-sans-serif,system-ui;background:#f8f8f8;margin:0;padding:0;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#8b0000;color:white;}
+nav h2{margin:0;font-size:20px;}
+nav .team-name{font-weight:400;font-size:16px;}
+.container{max-width:900px;margin:20px auto;background:#fff;padding:24px;border-radius:16px;box-shadow:0 8px 25px rgba(0,0,0,0.1);}
+h1{color:#8b0000;}
+label{display:block;margin-top:12px;font-weight:600;}
+input, select, button{padding:10px;width:100%;margin-top:6px;border-radius:8px;border:1px solid #ccc;}
+button{cursor:pointer;background:#8b0000;color:white;font-weight:600;border:none;}
+.qr-wrap{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;}
+.qr-box{display:flex;flex-direction:column;align-items:center;}
+.qr-box canvas{border:1px solid #ccc;margin-bottom:6px;}
+.toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #8b0000;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
+.toast.show{right:20px;}
+.toast.success{border-left-color:green;}
+.toast.error{border-left-color:red;}
+nav button{background:#fff;color:#8b0000;border-radius:8px;padding:6px 12px;font-weight:600;margin-left:8px;}
+.table-wrap{margin-top:20px;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:10px;border:1px solid #ccc;text-align:center;}
+.search-bar{margin-top:12px;}
+/* Modal styles */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:10000;}
+.modal-content{background:#fff;padding:24px;border-radius:16px;max-width:400px;width:90%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3);}
+.modal-close{position:absolute;top:10px;right:10px;cursor:pointer;font-size:20px;font-weight:bold;color:#8b0000;}
+.modal-content h3{margin-top:0;}
+.modal-content canvas{border:1px solid #ccc;margin-bottom:12px;}
+.modal-content button{width:100%;}
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+  <div>
+    <h2>🚂 LaserQR</h2>
+    <span class="team-name">Team Electro Medics</span>
+  </div>
+  <div>
+    <button id="nav-dashboard">Dashboard</button>
+    <button id="nav-viewqr">View QR</button>
+  </div>
+</nav>
+
+<!-- Dashboard -->
+<div class="container" id="dashboard">
+<h1>Welcome, <span id="vendor-name">Vendor</span></h1>
+
+<label>Material</label>
+<select id="material">
+  <option value="" disabled selected>Select material</option>
+  <option value="Elastic Rail Clip">Elastic Rail Clip</option>
+  <option value="Liner">Liner</option>
+  <option value="Rail Pad">Rail Pad</option>
+  <option value="Sleeper">Sleeper</option>
+</select>
+
+<label>Manufacturing Date</label>
+<input type="date" id="mfg-date">
+
+<label>Warranty (months)</label>
+<input type="number" id="warranty" min="1" placeholder="Enter warranty in months">
+
+<label>Number of QR Codes</label>
+<select id="qr-count">
+  <option value="1">1</option>
+  <option value="10">10</option>
+</select>
+
+<button id="generate-qr">Generate QR Codes</button>
+
+<div class="qr-wrap" id="qr-wrap"></div>
+</div>
+
+<!-- View QR Page -->
+<div class="container" id="view-qr" style="display:none">
+<h1>All Generated QR Codes</h1>
+
+<input type="text" id="search-bar" class="search-bar" placeholder="Search by material or ID">
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>ID</th><th>Material</th><th>MFG Date</th><th>Warranty</th><th>Action</th></tr>
+</thead>
+<tbody id="qr-table-body">
+<!-- QR list populated here -->
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- Modal -->
+<div id="qr-modal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" id="modal-close">&times;</span>
+    <h3>QR Info</h3>
+    <canvas id="modal-qr"></canvas>
+    <p id="modal-info"></p>
+    <button id="modal-download">Download QR</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- QRCode library -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getDatabase, ref, set, get, child, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
+  authDomain: "laserqr-fd4fa.firebaseapp.com",
+  databaseURL: "https://laserqr-fd4fa-default-rtdb.firebaseio.com",
+  projectId: "laserqr-fd4fa",
+  storageBucket: "laserqr-fd4fa.firebasestorage.app",
+  messagingSenderId: "191584527271",
+  appId: "1:191584527271:web:71dad945fa1b18c0024c82",
+  measurementId: "G-88ZMKEZT24"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+// Toast
+function showToast(msg,type="info"){
+  const toast=document.getElementById("toast");
+  toast.textContent=msg;
+  toast.className="toast show "+(type==="error"?"error":"success");
+  setTimeout(()=>toast.classList.remove("show"),4000);
+}
+
+// Views toggle
+const dashboardView = document.getElementById("dashboard");
+const viewQRView = document.getElementById("view-qr");
+document.getElementById("nav-dashboard").onclick = ()=>{dashboardView.style.display="block"; viewQRView.style.display="none";}
+document.getElementById("nav-viewqr").onclick = ()=>{dashboardView.style.display="none"; viewQRView.style.display="block"; loadQRTable();}
+
+// Vendor info
+let vendorUID = '';
+onAuthStateChanged(auth, async user => {
+  if(user){
+    vendorUID = user.uid;
+    const snap = await get(child(ref(db), "users/" + user.uid));
+    if(snap.exists()){
+      const name = snap.val().name || "Vendor";
+      document.getElementById("vendor-name").textContent = name;
+    }
+  } else { window.location.href = "index.html"; }
+});
+
+// QR Generation
+document.getElementById("generate-qr").onclick = async () => {
+  const material = document.getElementById("material").value;
+  const mfgDate = document.getElementById("mfg-date").value;
+  const warranty = document.getElementById("warranty").value;
+  const qrCount = parseInt(document.getElementById("qr-count").value);
+  const vendorName = document.getElementById("vendor-name").textContent;
+  
+  if(!material || !mfgDate || !warranty) return showToast("Fill all fields","error");
+  
+  const qrWrap = document.getElementById("qr-wrap");
+  qrWrap.innerHTML="";
+
+  for(let i=0;i<qrCount;i++){
+    const rand = Math.floor(100 + Math.random()*900);
+    const shortMat = material.split(" ").map(w=>w[0]).join("");
+    const id = shortMat + rand;
+    const qrData = {vendor:vendorName,material,mfgDate,warranty,id};
+    
+    // Save to Firebase
+    await push(ref(db,'vendor_qrs/'+vendorUID), qrData);
+
+    const qrBox = document.createElement("div");
+    qrBox.className = "qr-box";
+    const canvas = document.createElement("canvas");
+    await QRCode.toCanvas(canvas, JSON.stringify(qrData), {width:150});
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = id + ".png";
+    link.textContent = "Download QR";
+    qrBox.appendChild(canvas);
+    qrBox.appendChild(link);
+    qrWrap.appendChild(qrBox);
+  }
+  showToast(qrCount + " QR code(s) generated!", "success");
+};
+
+// Modal elements
+const modal = document.getElementById("qr-modal");
+const modalClose = document.getElementById("modal-close");
+const modalCanvas = document.getElementById("modal-qr");
+const modalInfo = document.getElementById("modal-info");
+const modalDownload = document.getElementById("modal-download");
+modalClose.onclick = ()=>modal.style.display="none";
+window.onclick = e => {if(e.target===modal) modal.style.display="none";}
+
+// Load QR Table
+async function loadQRTable(searchTerm=''){
+  const tableBody = document.getElementById("qr-table-body");
+  tableBody.innerHTML='';
+  const snap = await get(ref(db,'vendor_qrs/'+vendorUID));
+  if(snap.exists()){
+    const data = snap.val();
+    Object.values(data).forEach(item=>{
+      if(searchTerm && !item.material.toLowerCase().includes(searchTerm.toLowerCase()) && !item.id.toLowerCase().includes(searchTerm.toLowerCase())) return;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${item.id}</td>
+        <td>${item.material}</td>
+        <td>${item.mfgDate}</td>
+        <td>${item.warranty}</td>
+        <td><button class="view-btn">View QR</button></td>
+      `;
+      tr.querySelector(".view-btn").onclick = async ()=>{
+        modal.style.display="flex";
+        modalInfo.innerHTML=`<strong>Vendor:</strong> ${item.vendor}<br>
+        <strong>Material:</strong> ${item.material}<br>
+        <strong>ID:</strong> ${item.id}<br>
+        <strong>MFG Date:</strong> ${item.mfgDate}<br>
+        <strong>Warranty:</strong> ${item.warranty} months`;
+        await QRCode.toCanvas(modalCanvas, JSON.stringify(item), {width:200});
+        modalDownload.href = modalCanvas.toDataURL("image/png");
+        modalDownload.download = item.id+".png";
+      }
+      tableBody.appendChild(tr);
+    });
+  }
+}
+
+// Search bar
+document.getElementById("search-bar").addEventListener("input",(e)=>{
+  loadQRTable(e.target.value);
+});
+</script>
+</body>
+</html>
