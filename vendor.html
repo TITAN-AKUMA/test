@@ -44,6 +44,7 @@ th,td{padding:10px;border:1px solid #ccc;text-align:center;}
   <div>
     <button id="nav-dashboard">Dashboard</button>
     <button id="nav-viewqr">View QR</button>
+    <button id="logout-btn">Logout</button>
   </div>
 </nav>
 
@@ -108,7 +109,7 @@ th,td{padding:10px;border:1px solid #ccc;text-align:center;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, set, get, child, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
@@ -136,6 +137,12 @@ const dashboardView = document.getElementById("dashboard");
 const viewQRView = document.getElementById("view-qr");
 document.getElementById("nav-dashboard").onclick = ()=>{dashboardView.style.display="block"; viewQRView.style.display="none";}
 document.getElementById("nav-viewqr").onclick = ()=>{dashboardView.style.display="none"; viewQRView.style.display="block"; loadQRTable();}
+
+// 🔴 Logout button logic
+document.getElementById("logout-btn").onclick = async ()=>{
+  await signOut(auth);
+  window.location.href = "index.html";
+}
 
 let vendorUID = '';
 onAuthStateChanged(auth, async user => {
@@ -166,7 +173,6 @@ document.getElementById("generate-qr").onclick = async () => {
     const shortMat = material.split(" ").map(w=>w[0]).join("");
     const id = shortMat + rand;
     
-    // ✅ FIX: include vendorUID in QR
     const qrData = {vendor:vendorName,material,mfgDate,warranty,id,vendorUID};
     
     await push(ref(db,'vendor_qrs/'+vendorUID), qrData);

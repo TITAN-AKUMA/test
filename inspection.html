@@ -23,14 +23,18 @@ h2 { text-align:center; color:#36454f; margin-top:20px; font-size:18px; }
 #reader { width:100%; margin:15px auto; min-height:250px; border:1px solid #ccc; border-radius:8px; }
 
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:10000;}
-.modal-content{background:#fff;padding:24px;border-radius:16px;max-width:600px;width:90%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3); max-height:80vh; overflow-y:auto;}
+.modal-content{background:#fff;padding:24px;border-radius:16px;max-width:900px;width:95%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto;}
 .modal-close{position:absolute;top:10px;right:10px;cursor:pointer;font-size:20px;font-weight:bold;color:#8b0000;}
 .modal-content canvas{border:1px solid #ccc; margin-bottom:12px;}
 .modal-content table{width:100%; border-collapse:collapse; margin-top:10px;}
 .modal-content th, .modal-content td{padding:8px; border:1px solid #ccc; text-align:center;}
 .modal-content tr:nth-child(even){background:#f8f8f8;}
 .modal-content tr:hover td{background:#d1e7ff;}
-.modal-content button{width:100%; padding:10px; border:none; border-radius:8px; background:#8b0000; color:white; font-weight:600; margin-top:10px; cursor:pointer;}
+.modal-content button{padding:6px 12px; border:none; border-radius:8px; background:#8b0000; color:white; font-weight:600; cursor:pointer;}
+
+#scanned-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+#scanned-controls input{flex:1;padding:6px;border-radius:6px;border:1px solid #ccc;}
+#scanned-controls button{margin-left:10px;}
 
 .toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #8b0000;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
 .toast.show{right:20px;}
@@ -66,7 +70,12 @@ h2 { text-align:center; color:#36454f; margin-top:20px; font-size:18px; }
   <div class="modal-content">
     <span class="modal-close" id="modal-close">&times;</span>
     <h3>All Scanned QR Codes</h3>
+    <div id="scanned-controls">
+      <input type="text" id="search-bar" placeholder="Search scanned QR...">
+      <button id="analyze-ai-btn">Analyze with AI</button>
+    </div>
     <div id="scanned-list"></div>
+    <div id="analysis-report" style="margin-top:20px;"></div>
   </div>
 </div>
 
@@ -146,16 +155,17 @@ function onScanSuccess(decodedText){
     const dataObj = JSON.parse(decodedText);
     const qrId = dataObj.id || dataObj.ID || Math.random().toString(36).substring(2,8);
     dataObj.ID = qrId;
+    dataObj.supplyDate = new Date().toISOString().split("T")[0]; // Auto add supply date
     set(ref(db,'inspection_qr/'+qrId), dataObj);
     displayScanResult(dataObj);
-    showToast("QR scanned successfully","success");
+    showToast("QR scanned & inspected (supply date added)","success");
   }catch(e){ showToast("Invalid QR Code","error"); }
 }
 
 function displayScanResult(data){
   const div = document.getElementById('scan-result');
   let tableHTML='<table>';
-  for(const key of ['ID','vendor','material','mfgDate','warranty']){
+  for(const key of ['ID','vendor','material','mfgDate','warranty','supplyDate']){
     if(data[key]!==undefined) tableHTML += `<tr><th>${key}</th><td>${data[key]}</td></tr>`;
   }
   tableHTML+='</table>';
@@ -168,14 +178,16 @@ const modalClose = document.getElementById('modal-close');
 modalClose.onclick = ()=>modal.style.display="none";
 window.onclick = e => {if(e.target===modal || e.target===qrModal) qrModal.style.display="none";}
 
-document.getElementById('btn-view-scanned').onclick = async ()=>{
+document.getElementById('btn-view-scanned').onclick = async ()=> loadScannedList();
+
+async function loadScannedList(){
   modal.style.display="flex";
   const listDiv = document.getElementById('scanned-list');
   listDiv.innerHTML='Loading...';
   const snap = await get(ref(db,'inspection_qr'));
   if(snap.exists()){
     const data = snap.val();
-    let html='<table><tr><th>ID</th><th>Material</th><th>Vendor</th><th>MFG Date</th><th>Warranty</th><th>QR</th></tr>';
+    let html='<table><tr><th>ID</th><th>Material</th><th>Vendor</th><th>MFG Date</th><th>Warranty</th><th>Supply Date</th><th>QR</th></tr>';
     Object.values(data).forEach(item=>{
       html+=`<tr>
         <td>${item.ID || ''}</td>
@@ -183,12 +195,40 @@ document.getElementById('btn-view-scanned').onclick = async ()=>{
         <td>${item.vendor || ''}</td>
         <td>${item.mfgDate || ''}</td>
         <td>${item.warranty || ''}</td>
+        <td>${item.supplyDate || ''}</td>
         <td><button onclick='showQRCodeModal(${JSON.stringify(item).replace(/'/g,"\\'")})'>View QR</button></td>
       </tr>`;
     });
     html+='</table>';
     listDiv.innerHTML=html;
   }else{ listDiv.innerHTML='No QR codes scanned yet.'; }
+}
+
+// AI ANALYSIS
+document.getElementById('analyze-ai-btn').onclick = async ()=>{
+  const snap = await get(ref(db,'inspection_qr'));
+  const reportDiv = document.getElementById('analysis-report');
+  if(!snap.exists()){ reportDiv.innerHTML="<p>No data for analysis</p>"; return; }
+  const data = snap.val();
+  let expired=[];
+  Object.values(data).forEach(item=>{
+    let warrantyMonths = parseInt(item.warranty)||0;
+    if(item.supplyDate){
+      let supplyDate = new Date(item.supplyDate);
+      let expiry = new Date(supplyDate);
+      expiry.setMonth(expiry.getMonth()+warrantyMonths);
+      if(new Date()>expiry){ expired.push(item); }
+    }
+  });
+
+  let html="<h4>AI Analysis Report</h4>";
+  if(expired.length){ 
+    html+="<h5>⚠️ Warranty Finished Materials:</h5><ul>";
+    expired.forEach(i=> html+=`<li>${i.ID} - ${i.material} (Vendor: ${i.vendor})</li>`);
+    html+="</ul>";
+  }
+  if(!expired.length) html+="<p>✅ All materials are within warranty.</p>";
+  reportDiv.innerHTML=html;
 }
 
 // QR VIEW POPUP MODAL
@@ -198,21 +238,18 @@ qrModalClose.onclick = ()=> qrModal.style.display="none";
 
 window.showQRCodeModal = function(item){
   qrModal.style.display = "flex";
-
-  // Fill QR info
   document.getElementById('qr-info').innerHTML = `
     ID: ${item.ID || ''}<br>
     Vendor: ${item.vendor || ''}<br>
     Material: ${item.material || ''}<br>
     MFG Date: ${item.mfgDate || ''}<br>
-    Warranty: ${item.warranty || ''} months
+    Warranty: ${item.warranty || ''} months<br>
+    Supply Date: ${item.supplyDate || ''}
   `;
-
-  // Generate QR
   const canvas = document.getElementById('qr-view-canvas');
   QRCode.toCanvas(canvas, JSON.stringify(item), {width:200});
 
-  // Download button
+  // Download QR
   document.getElementById('download-qr-btn').onclick = ()=>{
     const link = document.createElement('a');
     link.href = canvas.toDataURL("image/png");

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LaserQR — Railway Officer Dashboard (AI Analyzer)</title>
+
+  <!-- QR Code Library (global QRCode) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+  <!-- Firebase (modular v9) -->
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+
+  <style>
+    :root{
+      --rail-maroon:#8b0000;
+      --rail-dark:#36454f;
+      --card-bg:#ffffff;
+      --muted:#7a7a7a;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f2efe9; margin:0; padding:0; color:var(--rail-dark)}
+    nav{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:var(--rail-maroon);color:white;flex-wrap:wrap}
+    nav h1{margin:0;font-size:20px}
+    nav .nav-actions{display:flex;gap:8px;align-items:center}
+    button, .btn{background:white;color:var(--rail-maroon);border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer}
+    button:hover, .btn:hover{opacity:.9}
+    .container{max-width:1200px;margin:20px auto;padding:18px;background:var(--card-bg);border-radius:14px;box-shadow:0 8px 25px rgba(0,0,0,.08)}
+    .top-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+    .search-bar{flex:1;min-width:220px;padding:10px;border-radius:10px;border:1px solid #d8d8d8}
+    .controls{display:flex;gap:8px;align-items:center}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border:1px solid #e6e6e6;text-align:left;font-size:13px}
+    th{background:#fafafa}
+    tr:nth-child(even) td{background:#fcfcfd}
+    tr:hover td{background:#eef7ff}
+    .pill{display:inline-block;padding:6px 8px;border-radius:8px;font-weight:600;font-size:12px}
+    .ok{background:#e6fff1;color:green}
+    .warn{background:#fff8e6;color:#b06b00}
+    .err{background:#fff0f0;color:#c0392b}
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);justify-content:center;align-items:center;z-index:9999}
+    .modal.show{display:flex}
+    .modal-card{width:760px;max-width:95%;background:white;padding:18px;border-radius:12px;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+    .modal-close{position:absolute;right:14px;top:10px;font-size:20px;cursor:pointer;color:var(--rail-maroon)}
+    .qr-canvas{border:1px solid #e6e6e6;border-radius:6px;margin-bottom:10px}
+    .report{margin-top:14px;padding:12px;background:#fbfbff;border-radius:10px;border:1px solid #eef}
+    .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .small{font-size:12px;color:var(--muted)}
+    .download-link{color:var(--rail-maroon);text-decoration:none;font-weight:700}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .card-stat{background:#fff;padding:10px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.03);min-width:160px}
+    footer{padding:12px;text-align:center;color:var(--muted);font-size:13px}
+    @media (max-width:760px){ .top-row{flex-direction:column;align-items:stretch} }
+  </style>
+</head>
+<body>
+
+<nav>
+  <h1>🚂 LaserQR — Officer Dashboard</h1>
+  <div class="nav-actions">
+    <button onclick="downloadAllJSON()">Export JSON</button>
+    <button onclick="downloadAllCSV()">Export CSV</button>
+    <button onclick="clearCache()">Clear Local</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="top-row">
+    <input id="search-bar" class="search-bar" placeholder="Search by ID, Vendor, Material..." />
+    <div class="controls">
+      <select id="filter-status" class="search-bar" style="width:180px">
+        <option value="">All Statuses</option>
+        <option value="ok">OK</option>
+        <option value="warn">Warranty / Near Expiry</option>
+        <option value="missing">Missing / Inspection Pending</option>
+        <option value="duplicate">Duplicate ID</option>
+        <option value="outlier">Date Outlier</option>
+      </select>
+      <button class="btn" onclick="runAIAnalysis()">⚡ Run AI Analysis</button>
+      <button class="btn" onclick="refreshData()">⟳ Refresh</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats-area">
+    <!-- small summary cards -->
+  </div>
+
+  <table aria-label="Scanned QR Table">
+    <thead>
+      <tr>
+        <th style="width:110px">ID</th>
+        <th>Vendor</th>
+        <th>Material</th>
+        <th>MFG Date</th>
+        <th>Supply Date</th>
+        <th>Warranty (mo)</th>
+        <th>Status</th>
+        <th style="width:120px">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="qr-table-body">
+      <tr><td colspan="8" class="small">Loading...</td></tr>
+    </tbody>
+  </table>
+
+  <div id="analysis-report" class="report small"></div>
+</div>
+
+<!-- Modal for QR view / details -->
+<div id="qr-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <span class="modal-close" id="modal-close">&times;</span>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <canvas id="qr-canvas" width="220" height="220" class="qr-canvas"></canvas>
+      <div style="flex:1">
+        <h3 id="modal-title">QR Item</h3>
+        <div id="modal-body" class="small"></div>
+        <div class="actions-row">
+          <button onclick="downloadModalQR()">Download QR</button>
+          <button onclick="copyItemJSON()">Copy JSON</button>
+          <button onclick="exportItemCSV()">Download CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>LaserQR — AI Analysis rules v1 • Project: AI based development of Laser based QR marking on 'track fittings on Indian Railways' • By ELECTRO MEDICS</footer>
+
+<script type="module">
+  // ---- Firebase imports (modular) ----
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+  // ---------- Your Firebase config (as provided) ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
+    authDomain: "laserqr-fd4fa.firebaseapp.com",
+    databaseURL: "https://laserqr-fd4fa-default-rtdb.firebaseio.com",
+    projectId: "laserqr-fd4fa",
+    storageBucket: "laserqr-fd4fa.firebasestorage.app",
+    messagingSenderId: "191584527271",
+    appId: "1:191584527271:web:71dad945fa1b18c0024c82",
+    measurementId: "G-88ZMKEZT24"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+
+  // ---- Global state ----
+  let allQRData = {};                 // keyed by unique key from DB
+  let analyzedItems = [];             // array of enriched items
+  let idCounts = {};                  // for duplicates
+  const now = () => new Date();
+
+  // ---- Utility helpers ----
+  function showToast(msg='Done', type='info'){
+    // quick toast using console (keep simple - replace with UI toast if desired)
+    console.log(`[Toast:${type}] ${msg}`);
+  }
+
+  function safeDateParse(s){
+    if(!s) return null;
+    // Accept YYYY-MM-DD, DD/MM/YYYY, ISO etc.
+    const iso = new Date(s);
+    if(!isNaN(iso.getTime())) return iso;
+    const parts = s.split(/[-\/\.]/).map(p=>p.trim());
+    if(parts.length===3){
+      let d,m,y;
+      if(parseInt(parts[0])>12){
+        d = parseInt(parts[0]); m = parseInt(parts[1]); y = parseInt(parts[2]);
+      } else {
+        if(parts[0].length===4){ y = parseInt(parts[0]); m = parseInt(parts[1]); d = parseInt(parts[2]); }
+        else { d = parseInt(parts[0]); m = parseInt(parts[1]); y = parseInt(parts[2]); }
+      }
+      const dt = new Date(y, m-1, d);
+      if(!isNaN(dt.getTime())) return dt;
+    }
+    return null;
+  }
+
+  function monthsBetween(d1,d2){
+    if(!d1||!d2) return null;
+    const y = d2.getFullYear() - d1.getFullYear();
+    const m = d2.getMonth() - d1.getMonth();
+    return y*12 + m + (d2.getDate() >= d1.getDate() ? 0 : -1);
+  }
+
+  function addLeadingZero(n){ return n<10? '0'+n : ''+n; }
+  function formatDate(d){
+    if(!d) return '';
+    return `${d.getFullYear()}-${addLeadingZero(d.getMonth()+1)}-${addLeadingZero(d.getDate())}`;
+  }
+
+  // ---- Fetch & render ----
+  async function refreshData(){
+    document.getElementById('qr-table-body').innerHTML = `<tr><td colspan="8" class="small">Refreshing...</td></tr>`;
+    try{
+      const snap = await get(ref(db,'inspection_qr'));
+      if(!snap.exists()){
+        allQRData = {};
+        renderTable();
+        return;
+      }
+      allQRData = snap.val();
+      // cache locally for quick access
+      localStorage.setItem('laserqr_cache', JSON.stringify(allQRData));
+      runAIAnalysis(); // automatically analyze on refresh
+    }catch(err){
+      console.error("Firebase read error", err);
+      // If offline, fallback to local cache
+      const local = localStorage.getItem('laserqr_cache');
+      if(local){
+        allQRData = JSON.parse(local);
+        runAIAnalysis();
+        showToast("Used cached data (offline)", "warn");
+      } else {
+        document.getElementById('qr-table-body').innerHTML = `<tr><td colspan="8">Failed to load data.</td></tr>`;
+      }
+    }
+  }
+
+  // Render table rows from analyzedItems (which has `statusTags`)
+  function renderTable(filterText='', filterStatus=''){
+    const tbody = document.getElementById('qr-table-body');
+    tbody.innerHTML = '';
+    const ft = (filterText||'').toLowerCase();
+    let count=0;
+    // sort: worst status first
+    const priority = { 'err':1, 'warn':2, 'outlier':3, 'duplicate':4, 'missing':5, 'ok':10 };
+    const sorted = analyzedItems.slice().sort((a,b)=> (priority[a.topSeverity]||99) - (priority[b.topSeverity]||99));
+    sorted.forEach(item=>{
+      if(filterStatus && item.topSeverity !== filterStatus) return;
+      if(ft){
+        const hay = ((item.ID||'')+' '+(item.vendor||'')+' '+(item.material||'')).toLowerCase();
+        if(!hay.includes(ft)) return;
+      }
+      const tr = document.createElement('tr');
+      const statusPill = getSeverityPill(item.topSeverity, item.topSeverityLabel);
+      tr.innerHTML = `
+        <td>${item.ID || ''}</td>
+        <td>${item.vendor || ''}</td>
+        <td>${item.material || ''}</td>
+        <td>${item.mfgDate || ''}</td>
+        <td>${item.supplyDate || ''}</td>
+        <td>${item.warranty || ''}</td>
+        <td>${statusPill}</td>
+        <td>
+          <button class="btn" data-key="${item.__dbKey||''}" onclick="viewItem(event)">View</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      count++;
+    });
+    if(count===0){
+      tbody.innerHTML = `<tr><td colspan="8" class="small">No items match your filters/search.</td></tr>`;
+    }
+    renderStats();
+  }
+
+  function getSeverityPill(sev,label){
+    if(sev==='err') return `<span class="pill err">${label}</span>`;
+    if(sev==='warn') return `<span class="pill warn">${label}</span>`;
+    if(sev==='outlier') return `<span class="pill warn">${label}</span>`;
+    if(sev==='duplicate') return `<span class="pill err">${label}</span>`;
+    if(sev==='missing') return `<span class="pill warn">${label}</span>`;
+    return `<span class="pill ok">${label}</span>`;
+  }
+
+  // ---- AI Analysis (rules-based, explainable) ----
+  function runAIAnalysis(){
+    analyzedItems = [];
+    idCounts = {};
+    // Step 1: collect and compute basic stats
+    Object.entries(allQRData).forEach(([key,item])=>{
+      // normalize keys: expecting fields like ID, vendor, material, mfgDate, supplyDate, warranty
+      const obj = Object.assign({}, item);
+      obj.__dbKey = key;
+      obj.ID = (obj.ID || obj.id || obj.serial || '').toString();
+      // count duplicates
+      if(obj.ID) idCounts[obj.ID] = (idCounts[obj.ID]||0)+1;
+      analyzedItems.push(obj);
+    });
+
+    const nowDt = now();
+    const anomalies = { expired:[], missing:[], duplicates:[], outliers:[] };
+    // derive item-level statuses
+    analyzedItems = analyzedItems.map(item=>{
+      const issues = [];
+      const reasons = [];
+      // Missing critical fields
+      if(!item.ID) { issues.push('missing'); reasons.push('Missing ID'); }
+      if(!item.vendor) { issues.push('missing'); reasons.push('Missing vendor'); }
+      if(!item.material) { issues.push('missing'); reasons.push('Missing material'); }
+
+      // supply date empty => inspection not done
+      if(!item.supplyDate || (item.supplyDate || '').toString().trim()===''){
+        issues.push('missing');
+        reasons.push('Supply date empty (Inspection not done)');
+        anomalies.missing.push(item);
+      }
+
+      // parse dates
+      const mfg = safeDateParse(item.mfgDate);
+      const supply = safeDateParse(item.supplyDate);
+
+      // date outliers: mfg/supply in future, or mfg > supply
+      if(mfg && mfg.getTime() > nowDt.getTime()+24*3600*1000){
+        issues.push('outlier'); reasons.push('MFG date in future');
+        anomalies.outliers.push(item);
+      }
+      if(supply && supply.getTime() > nowDt.getTime()+24*3600*1000){
+        issues.push('outlier'); reasons.push('Supply date in future');
+        anomalies.outliers.push(item);
+      }
+      if(mfg && supply && mfg.getTime() > supply.getTime()){
+        issues.push('outlier'); reasons.push('MFG > Supply (order mismatch)');
+        anomalies.outliers.push(item);
+      }
+      // warranty checks: if numeric months available
+      const w = parseInt(item.warranty);
+      if(supply && !isNaN(w)){
+        const expiry = new Date(supply.getTime());
+        expiry.setMonth(expiry.getMonth() + w);
+        const monthsLeft = monthsBetween(nowDt, expiry);
+        item.__expiryDate = expiry;
+        item.__monthsLeft = monthsLeft;
+        if(monthsLeft < 0){
+          issues.push('warn'); reasons.push('Warranty expired');
+          anomalies.expired.push(item);
+        } else if(monthsLeft <= 1){
+          issues.push('warn'); reasons.push('Warranty near expiry (<1 month)');
+        }
+      } else {
+        // If no warranty data, flag missing (but only if not already flagged for supply date missing)
+        if(!item.warranty) { if(!reasons.includes('Missing warranty info')) { issues.push('missing'); reasons.push('Missing warranty info'); anomalies.missing.push(item); } }
+      }
+
+      // duplicates
+      if(item.ID && idCounts[item.ID] && idCounts[item.ID] > 1){
+        issues.push('duplicate'); reasons.push(`Duplicate ID (${idCounts[item.ID]})`);
+        anomalies.duplicates.push(item);
+      }
+
+      // compute top severity
+      // severity order: err (missing/duplicate) > warn (warranty) > outlier > ok
+      let topSeverity='ok';
+      let topLabel='OK';
+      if(issues.includes('missing') || issues.includes('duplicate')) { topSeverity='missing'; topLabel = 'Missing / Inspection Pending'; }
+      else if(issues.includes('warn')) { topSeverity='warn'; topLabel='Warranty Issue'; }
+      else if(issues.includes('outlier')) { topSeverity='outlier'; topLabel='Date Outlier'; }
+
+      // normalize: if duplicate present and also missing, mark duplicate as 'duplicate' in reasons but still topSeverity 'missing' so user sees inspection pending first
+      if(issues.includes('duplicate')) {
+        // keep 'duplicate' reason but topSeverity stays as determined above
+      }
+
+      return Object.assign({}, item, { issues, reasons, topSeverity, topSeverityLabel: topLabel });
+    });
+
+    // Build analysis report
+    const reportDiv = document.getElementById('analysis-report');
+    let html = `<strong>AI Analysis Report — ${formatDate(nowDt)}</strong><br>`;
+    // counts
+    const total = analyzedItems.length;
+    const counts = analyzedItems.reduce((acc,it)=>{ acc[it.topSeverity] = (acc[it.topSeverity]||0)+1; return acc; }, {});
+    html += `<div style="margin-top:6px">Total scanned: <b>${total}</b> • OK: <b>${counts.ok||0}</b> • Inspection Pending / Missing: <b>${counts.missing||0}</b> • Warnings: <b>${counts.warn||0}</b> • Issues: <b>${(counts.duplicate||0)+(counts.outlier||0)||0}</b></div>`;
+
+    // Lists
+    if(anomalies.expired.length){
+      html += `<h4 style="margin-top:8px;margin-bottom:6px">⚠ Warranty Expired (${anomalies.expired.length})</h4><ul>`;
+      anomalies.expired.slice(0,10).forEach(i=> html += `<li>${i.ID} — ${i.material||'N/A'} (Vendor: ${i.vendor||'N/A'})</li>`);
+      html += `</ul>`;
+    }
+    if(anomalies.duplicates.length){
+      html += `<h4 style="margin-top:8px;margin-bottom:6px">❌ Duplicates (${anomalies.duplicates.length})</h4><ul>`;
+      Object.entries(idCounts).filter(([id,c])=>c>1).forEach(([id,c])=> html += `<li>${id} — Count: ${c}</li>`);
+      html += `</ul>`;
+    }
+    if(anomalies.missing.length){
+      html += `<h4 style="margin-top:8px;margin-bottom:6px">ℹ Missing Data / Inspection Pending (${anomalies.missing.length})</h4><ul>`;
+      anomalies.missing.slice(0,20).forEach(i=>{
+        const note = (!i.supplyDate || (i.supplyDate||'').toString().trim()==='') ? 'Supply date empty — Inspection not done' : 'Missing fields';
+        html += `<li>${i.ID || '(no id)'} — ${note} ${i.vendor ? ' (Vendor: '+i.vendor+')' : ''}</li>`;
+      });
+      html += `</ul>`;
+    }
+    if(anomalies.outliers.length){
+      html += `<h4 style="margin-top:8px;margin-bottom:6px">⚠ Date Outliers (${anomalies.outliers.length})</h4><ul>`;
+      anomalies.outliers.slice(0,10).forEach(i=> html += `<li>${i.ID} — ${i.reasons?.join(', ')||'Outlier'}</li>`);
+      html += `</ul>`;
+    }
+
+    // Actionable suggestions
+    html += `<h4 style="margin-top:8px">Actionable Suggestions</h4><ol>`;
+    html += `<li>Inspect items flagged as <b>Missing / Inspection Pending</b> immediately; supply date missing usually means the material hasn't been inspected/verified on site.</li>`;
+    html += `<li>Confirm vendor lot numbers and correct database entries for items flagged <b>Duplicate</b>.</li>`;
+    html += `<li>Replace or re-inspect items whose <b>warranty expired</b>. Prioritise safety-critical fittings.</li>`;
+    html += `<li>For <b>date outliers</b>, validate manufacturing/supply stamps—these often indicate data-entry errors.</li>`;
+    html += `<li>Export CSV and share with depot/TMS for batch correction and audit. Consider automating supply-date capture at inspection time.</li>`;
+    html += `</ol>`;
+
+    reportDiv.innerHTML = html;
+
+    // finally, render table
+    renderTable(document.getElementById('search-bar').value || '', document.getElementById('filter-status').value || '');
+    showToast('AI analysis completed', 'success');
+  }
+
+  // Render summary stats cards
+  function renderStats(){
+    const area = document.getElementById('stats-area');
+    const total = analyzedItems.length;
+    const counts = analyzedItems.reduce((acc,it)=>{ acc[it.topSeverity] = (acc[it.topSeverity]||0)+1; return acc; }, {});
+    const vendors = {};
+    analyzedItems.forEach(it => { if(it.vendor) vendors[it.vendor] = (vendors[it.vendor]||0)+1; });
+    const topVendors = Object.entries(vendors).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    area.innerHTML = `
+      <div class="card-stat"><div class="small">Total Scanned</div><div style="font-size:20px;font-weight:700">${total}</div></div>
+      <div class="card-stat"><div class="small">OK</div><div style="font-size:20px;font-weight:700">${counts.ok||0}</div></div>
+      <div class="card-stat"><div class="small">Inspection Pending / Missing</div><div style="font-size:20px;font-weight:700">${counts.missing||0}</div></div>
+      <div class="card-stat"><div class="small">Warnings</div><div style="font-size:20px;font-weight:700">${counts.warn||0}</div></div>
+      <div class="card-stat"><div class="small">Top Vendors</div><div style="font-size:14px">${topVendors.map(v=>`${v[0]} (${v[1]})`).join('<br>') || '—'}</div></div>
+    `;
+  }
+
+  // ---- View item modal ----
+  window.viewItem = function(ev){
+    const key = ev.currentTarget.getAttribute('data-key');
+    const item = analyzedItems.find(i=> i.__dbKey === key);
+    if(!item) return;
+    openModalWithItem(item);
+  }
+
+  const modal = document.getElementById('qr-modal');
+  document.getElementById('modal-close').onclick = ()=> modal.classList.remove('show');
+
+  function openModalWithItem(item){
+    modal.classList.add('show');
+    document.getElementById('modal-title').textContent = `Item — ${item.ID || '(no id)'}`;
+    const body = document.getElementById('modal-body');
+    let html = `<div style="margin-bottom:6px"><b>Vendor:</b> ${item.vendor || '—'}</div>`;
+    html += `<div style="margin-bottom:6px"><b>Material:</b> ${item.material || '—'}</div>`;
+    html += `<div style="margin-bottom:6px"><b>MFG Date:</b> ${item.mfgDate || '—'}</div>`;
+    html += `<div style="margin-bottom:6px"><b>Supply Date:</b> ${item.supplyDate || '—'}</div>`;
+    html += `<div style="margin-bottom:6px"><b>Warranty (months):</b> ${item.warranty || '—'}</div>`;
+    if(!item.supplyDate || (item.supplyDate||'').toString().trim()===''){
+      html += `<div style="margin-top:6px;color:#b06b00"><b>Inspection status:</b> Supply date missing — <u>Inspection not done</u></div>`;
+    }
+    if(item.__expiryDate) html += `<div style="margin-bottom:6px"><b>Warranty expiry:</b> ${formatDate(item.__expiryDate)} (${item.__monthsLeft} mo left)</div>`;
+    if(item.reasons && item.reasons.length) html += `<div style="margin-top:6px"><b>Flags:</b> ${item.reasons.join(', ')}</div>`;
+    html += `<pre style="margin-top:8px;background:#f7f7f7;padding:8px;border-radius:6px;overflow:auto;max-height:140px">${JSON.stringify(item,null,2)}</pre>`;
+    body.innerHTML = html;
+
+    // draw QR into canvas
+    const canvas = document.getElementById('qr-canvas');
+    const payload = JSON.stringify(item);
+    // Clear canvas
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Use QRCode lib to draw
+    QRCode.toCanvas(canvas, payload, { width: 220 }, function (error) {
+      if (error) console.error(error);
+    });
+    // store modal current item
+    modal.__currentItem = item;
+  }
+
+  window.downloadModalQR = function(){
+    const canvas = document.getElementById('qr-canvas');
+    const link = document.createElement('a');
+    const item = modal.__currentItem || {};
+    link.href = canvas.toDataURL('image/png');
+    link.download = (item.ID || 'qr') + '.png';
+    link.click();
+  }
+
+  window.copyItemJSON = function(){
+    const item = modal.__currentItem || {};
+    navigator.clipboard?.writeText(JSON.stringify(item)).then(()=> showToast('Copied JSON to clipboard','success'));
+  }
+
+  window.exportItemCSV = function(){
+    const item = modal.__currentItem || {};
+    const keys = Object.keys(item).filter(k=> !k.startsWith('__'));
+    const csv = keys.join(',') + '\n' + keys.map(k=> `"${(item[k]||'').toString().replace(/"/g,'""')}"`).join(',');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = (item.ID||'item')+'.csv';
+    link.click();
+  }
+
+  // ---- Export utilities ----
+  function downloadAllJSON(){
+    const blob = new Blob([JSON.stringify(allQRData, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'laserqr_export.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadAllCSV(){
+    // flatten all items
+    const items = Object.values(allQRData || {});
+    if(items.length===0){ alert('No data'); return; }
+    const keys = new Set();
+    items.forEach(it => Object.keys(it||{}).forEach(k=>keys.add(k)));
+    const header = Array.from(keys);
+    const rows = items.map(it => header.map(h=> `"${((it||{})[h]||'').toString().replace(/"/g,'""')}"`).join(','));
+    const csv = header.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'laserqr_export.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  window.clearCache = function(){
+    localStorage.removeItem('laserqr_cache');
+    showToast('Local cache cleared', 'info');
+  }
+
+  // Logout
+  window.logout = function(){
+    signOut(auth).then(()=> window.location.href='index.html').catch(err=> { alert('Logout failed: '+err.message); });
+  }
+
+  // refresh helper bound to UI
+  window.refreshData = refreshData;
+
+  // Filters & search
+  document.getElementById('search-bar').addEventListener('input', (e)=> renderTable(e.target.value || '', document.getElementById('filter-status').value || '') );
+  document.getElementById('filter-status').addEventListener('change', (e)=> renderTable(document.getElementById('search-bar').value || '', e.target.value || ''));
+
+  // export helpers used from nav (expose)
+  window.downloadAllCSV = downloadAllCSV;
+  window.downloadAllJSON = downloadAllJSON;
+
+  // initial load: try live then fallback
+  (async ()=> {
+    // wait for auth state: redirect to login if not authenticated
+    onAuthStateChanged(auth, user => {
+      if(!user){
+        // If not logged in, go to index.html for auth
+        window.location.href = 'index.html';
+      } else {
+        // user present -> load data
+        refreshData();
+      }
+    });
+  })();
+
+  // Small accessibility: close modal on escape
+  document.addEventListener('keydown', (e)=> { if(e.key==='Escape') modal.classList.remove('show'); });
+
+  // Make sure window functions are exposed for modal buttons
+  window.exportItemCSV = exportItemCSV;
+
+</script>
+
+</body>
+</html>
