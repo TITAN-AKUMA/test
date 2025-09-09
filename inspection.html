@@ -11,35 +11,52 @@
 
 <style>
 body { font-family: Inter, sans-serif; background:#f2efe9; margin:0; padding:0; }
+
+/* NAV */
 nav { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#8b0000; color:white; flex-wrap:wrap; }
-.nav-left h1 { font-size:22px; margin:0; }
-.nav-right button { background:white; color:#8b0000; border:none; border-radius:8px; padding:6px 12px; font-weight:600; margin-left:10px; cursor:pointer; }
+.nav-left h1 { font-size:20px; margin:0; }
+.nav-right{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+.nav-right button { background:white; color:#8b0000; border:none; border-radius:8px; padding:6px 12px; font-weight:600; cursor:pointer; }
 .nav-right button:hover { background:#f8f8f8; }
 
 h2 { text-align:center; color:#36454f; margin-top:20px; font-size:18px; }
 
-#scanner { max-width:400px; margin:30px auto; text-align:center; }
-#camera-select { width:100%; margin-bottom:10px; padding:6px; border-radius:5px; border:1px solid #ccc; }
-#reader { width:100%; margin:15px auto; min-height:250px; border:1px solid #ccc; border-radius:8px; }
+/* SCANNER */
+#scanner { max-width:500px; margin:20px auto; text-align:center; padding:0 12px; }
+#camera-select { width:100%; margin-bottom:10px; padding:8px; border-radius:5px; border:1px solid #ccc; }
+#reader { width:100%; margin:15px auto; min-height:250px; border:1px solid #ccc; border-radius:8px; background:white; }
+#scan-result { margin-top:15px; overflow-x:auto; }
 
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:10000;}
-.modal-content{background:#fff;padding:24px;border-radius:16px;max-width:900px;width:95%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto;}
+/* MODALS */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:10000;padding:10px;}
+.modal-content{background:#fff;padding:16px;border-radius:16px;max-width:900px;width:100%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto;}
 .modal-close{position:absolute;top:10px;right:10px;cursor:pointer;font-size:20px;font-weight:bold;color:#8b0000;}
-.modal-content canvas{border:1px solid #ccc; margin-bottom:12px;}
-.modal-content table{width:100%; border-collapse:collapse; margin-top:10px;}
-.modal-content th, .modal-content td{padding:8px; border:1px solid #ccc; text-align:center;}
+.modal-content canvas{border:1px solid #ccc; margin-bottom:12px; max-width:100%; height:auto;}
+.modal-content table{width:100%; border-collapse:collapse; margin-top:10px; font-size:14px;}
+.modal-content th, .modal-content td{padding:6px; border:1px solid #ccc; text-align:center; word-break:break-word;}
 .modal-content tr:nth-child(even){background:#f8f8f8;}
 .modal-content tr:hover td{background:#d1e7ff;}
 .modal-content button{padding:6px 12px; border:none; border-radius:8px; background:#8b0000; color:white; font-weight:600; cursor:pointer;}
 
-#scanned-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-#scanned-controls input{flex:1;padding:6px;border-radius:6px;border:1px solid #ccc;}
-#scanned-controls button{margin-left:10px;}
+/* SEARCH & CONTROL BAR */
+#scanned-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+#scanned-controls input{flex:1;min-width:140px;padding:6px;border-radius:6px;border:1px solid #ccc;}
+#scanned-controls button{flex-shrink:0;}
 
-.toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #8b0000;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
+/* TOAST */
+.toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #8b0000;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;max-width:80%;}
 .toast.show{right:20px;}
 .toast.success{border-left-color:green;}
 .toast.error{border-left-color:red;}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .nav-left h1{font-size:18px;}
+  h2{font-size:16px;}
+  .modal-content{padding:12px;}
+  .modal-content table{font-size:12px;}
+  #scanner{max-width:100%;}
+}
 </style>
 </head>
 <body>
@@ -47,6 +64,7 @@ h2 { text-align:center; color:#36454f; margin-top:20px; font-size:18px; }
 <!-- NAV -->
 <nav>
   <div class="nav-left">
+        <img style="width: 100px;" src="logo.png" alt="logo">
     <h1>🚂 LaserQR - Inspection</h1>
   </div>
   <div class="nav-right">

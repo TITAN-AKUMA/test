@@ -33,11 +33,55 @@ th,td{padding:10px;border:1px solid #ccc;text-align:center;}
 .modal-content canvas{border:1px solid #ccc;margin-bottom:12px;}
 .modal-content button{width:100%;}
 </style>
+<style>
+/* --- existing styles above --- */
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  nav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  nav div:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .container {
+    margin: 10px;
+    padding: 16px;
+  }
+  input, select, button {
+    width: 100%;
+  }
+  .qr-wrap {
+    justify-content: center;
+  }
+  table, th, td {
+    font-size: 14px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+  }
+  .modal-content {
+    width: 95%;
+    padding: 16px;
+  }
+  .modal-content canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+}
+</style>
+
 </head>
 <body>
 
 <nav>
   <div>
+        <img style="width: 100px;" src="logo.png" alt="logo">
     <h2>🚂 LaserQR</h2>
     <span class="team-name">Team Electro Medics</span>
   </div>
