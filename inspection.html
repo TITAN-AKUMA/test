@@ -12,13 +12,12 @@ nav .team-name{font-weight:400;font-size:16px;}
 .container{max-width:900px;margin:20px auto;background:#fff;padding:24px;border-radius:16px;box-shadow:0 8px 25px rgba(0,0,0,0.1);}
 h1{color:#ff8c00;}
 label{display:block;margin-top:12px;font-weight:600;}
-input, select, button{padding:10px;width:100%;margin-top:6px;border-radius:8px;border:1px solid #ccc;}
-button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none;}
+button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none;padding:10px;width:100%;border-radius:8px;margin-top:10px;}
 .toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #ff8c00;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
 .toast.show{right:20px;}
 .toast.success{border-left-color:green;}
 .toast.error{border-left-color:red;}
-#scanner{width:100%;height:300px;background:#000;margin-top:20px;border-radius:12px;}
+#scanner{width:100%;height:300px;border-radius:12px;background:#000;}
 .qr-info{margin-top:20px;background:#f8f8f8;padding:12px;border-radius:10px;border:1px solid #ccc;}
 </style>
 </head>
@@ -37,7 +36,7 @@ button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none
 <p>Scan QR Codes of Track Fittings supplied by vendors:</p>
 
 <!-- QR Scanner -->
-<div id="scanner"></div>
+<video id="scanner"></video>
 
 <!-- QR Info Display -->
 <div class="qr-info" id="qr-info" style="display:none">
@@ -51,9 +50,12 @@ button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, set, get, child, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
+QrScanner.WORKER_PATH = "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner-worker.min.js";
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
   authDomain: "laserqr-fd4fa.firebaseapp.com",
@@ -76,18 +78,14 @@ function showToast(msg,type="info"){
   setTimeout(()=>toast.classList.remove("show"),4000);
 }
 
-// Vendor UID tracking
+// Logged-in officer UID
 let officerUID = '';
-onAuthStateChanged(auth, async user => {
-  if(user){
-    officerUID = user.uid;
-  } else { window.location.href = "index.html"; }
+onAuthStateChanged(auth, user => {
+  if(user) officerUID = user.uid;
+  else window.location.href = "index.html";
 });
 
 // QR Scanner
-import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
-QrScanner.WORKER_PATH = "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner-worker.min.js";
-
 const scannerElem = document.getElementById("scanner");
 const qrInfoElem = document.getElementById("qr-info");
 const infoText = document.getElementById("info-text");
@@ -95,23 +93,28 @@ const infoText = document.getElementById("info-text");
 const scanner = new QrScanner(scannerElem, async result => {
     try {
         const data = JSON.parse(result);
-        qrInfoElem.style.display="block";
+        qrInfoElem.style.display = "block";
         infoText.innerHTML = `<strong>Vendor:</strong> ${data.vendor}<br>
                               <strong>Material:</strong> ${data.material}<br>
                               <strong>ID:</strong> ${data.id}<br>
                               <strong>MFG Date:</strong> ${data.mfgDate}<br>
                               <strong>Warranty:</strong> ${data.warranty} months`;
 
-        // Save supply/inspection date
+        // Supply date logging
         const supplyDate = new Date().toISOString().split('T')[0];
-        const qrRef = ref(db, `vendor_qrs/${data.vendorUID || 'unknown'}/${data.id}`);
+        if(!data.vendorUID){
+          showToast("QR missing vendorUID, cannot log supply date", "error");
+          return;
+        }
+        const qrRef = ref(db, `vendor_qrs/${data.vendorUID}/${data.id}`);
         await update(qrRef, {supplyDate, inspectedBy: officerUID});
-        showToast(`QR Scanned and supply date logged: ${supplyDate}`, "success");
+        showToast(`QR Scanned! Supply date logged: ${supplyDate}`, "success");
 
     } catch(e){
         showToast("Invalid QR code", "error");
     }
-});
+}, {preferredCamera: 'environment'});
+
 scanner.start();
 </script>
 
