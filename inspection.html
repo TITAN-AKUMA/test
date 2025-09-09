@@ -1,74 +1,97 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LaserQR — Inspection Officer Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LaserQR — Inspection Officer</title>
+
+<!-- QR Code Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+
 <style>
-body, html{margin:0;padding:0;height:100%;font-family:Inter,ui-sans-serif,system-ui;background:#f8f8f8;}
-nav{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#ff8c00;color:white;}
-nav h2{margin:0;font-size:20px;}
-nav .team-name{font-weight:400;font-size:16px;}
-.container{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:60px;box-sizing:border-box;}
-h1{color:#ff8c00;margin-bottom:10px;}
-button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none;padding:10px;width:100%;border-radius:8px;margin-top:10px;}
-.toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #ff8c00;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
+/* ---------- THEME ---------- */
+body { font-family: Inter, sans-serif; background:#f2efe9; margin:0; padding:0; }
+nav { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#8b0000; color:white; flex-wrap:wrap; }
+.nav-left h1 { font-size:22px; margin:0; }
+.nav-right button { background:white; color:#8b0000; border:none; border-radius:8px; padding:6px 12px; font-weight:600; margin-left:10px; cursor:pointer; }
+.nav-right button:hover { background:#f8f8f8; }
+
+h2 { text-align:center; color:#36454f; margin-top:20px; font-size:18px; }
+
+#scanner { max-width:400px; margin:30px auto; text-align:center; }
+#camera-select { width:100%; margin-bottom:10px; padding:6px; border-radius:5px; border:1px solid #ccc; }
+#reader { width:100%; margin:15px auto; min-height:250px; border:1px solid #ccc; border-radius:8px; }
+
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:10000;}
+.modal-content{background:#fff;padding:24px;border-radius:16px;max-width:600px;width:90%;position:relative;box-shadow:0 8px 25px rgba(0,0,0,0.3); max-height:80vh; overflow-y:auto;}
+.modal-close{position:absolute;top:10px;right:10px;cursor:pointer;font-size:20px;font-weight:bold;color:#8b0000;}
+.modal-content canvas{border:1px solid #ccc; margin-bottom:12px;}
+.modal-content table{width:100%; border-collapse:collapse; margin-top:10px;}
+.modal-content th, .modal-content td{padding:8px; border:1px solid #ccc; text-align:center;}
+.modal-content tr:nth-child(even){background:#f8f8f8;}
+.modal-content tr:hover td{background:#d1e7ff;}
+.modal-content button{width:100%; padding:10px; border:none; border-radius:8px; background:#8b0000; color:white; font-weight:600; margin-top:10px; cursor:pointer;}
+
+.toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #8b0000;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
 .toast.show{right:20px;}
 .toast.success{border-left-color:green;}
 .toast.error{border-left-color:red;}
-#scanner{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:-1;}
-.qr-info{position:relative;z-index:10;margin-top:20px;background:rgba(255,255,255,0.9);padding:12px;border-radius:10px;border:1px solid #ccc;max-width:400px;}
 </style>
 </head>
 <body>
 
+<!-- ---------- NAV ---------- -->
 <nav>
-  <div>
-    <h2>🚂 LaserQR</h2>
-    <span class="team-name">Team Electro Medics</span>
+  <div class="nav-left">
+    <h1>🚂 LaserQR - Inspection</h1>
+  </div>
+  <div class="nav-right">
+    <button id="btn-dashboard">Dashboard</button>
+    <button id="btn-view-scanned">View Scanned QR</button>
+    <button onclick="logout()">Logout</button>
   </div>
 </nav>
 
-<div class="container">
-<h1>Inspection Officer Dashboard</h1>
-<p>Scan QR Codes of Track Fittings supplied by vendors:</p>
-
-<!-- QR Scanner Video -->
-<video id="scanner"></video>
-
-<!-- QR Info Display -->
-<div class="qr-info" id="qr-info" style="display:none">
-  <h3>QR Scanned:</h3>
-  <p id="info-text"></p>
+<!-- ---------- SCANNER ---------- -->
+<div id="scanner">
+  <h2>SCAN QR CODE</h2>
+  <select id="camera-select"></select>
+  <button onclick="startSelectedCamera()">Start Scanner</button>
+  <div id="reader"></div>
+  <div id="scan-result"></div>
 </div>
+
+<!-- ---------- MODAL ---------- -->
+<div id="scanned-modal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" id="modal-close">&times;</span>
+    <h3>All Scanned QR Codes</h3>
+    <div id="scanned-list"></div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
-QrScanner.WORKER_PATH = "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner-worker.min.js";
+import { getDatabase, ref, set, get, child, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCzzNaUWyBn_z7A5Rjt_ooR3yEfA44heJA",
   authDomain: "laserqr-fd4fa.firebaseapp.com",
   databaseURL: "https://laserqr-fd4fa-default-rtdb.firebaseio.com",
   projectId: "laserqr-fd4fa",
-  storageBucket: "laserqr-fd4fa.firebasestorage.app",
+  storageBucket: "laserqr-fd4fa.appspot.com",
   messagingSenderId: "191584527271",
   appId: "1:191584527271:web:71dad945fa1b18c0024c82",
   measurementId: "G-88ZMKEZT24"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// Toast
 function showToast(msg,type="info"){
   const toast=document.getElementById("toast");
   toast.textContent=msg;
@@ -76,50 +99,123 @@ function showToast(msg,type="info"){
   setTimeout(()=>toast.classList.remove("show"),4000);
 }
 
-// Logged-in officer UID
-let officerUID = '';
+// ---------- AUTH ----------
 onAuthStateChanged(auth, user => {
-  if(user) officerUID = user.uid;
-  else window.location.href = "index.html";
+  if(!user) window.location.href='index.html';
 });
 
-// Scanner
-const scannerElem = document.getElementById("scanner");
-const qrInfoElem = document.getElementById("qr-info");
-const infoText = document.getElementById("info-text");
+window.logout = function(){
+  signOut(auth).then(()=>{ window.location.href='index.html'; })
+  .catch(err=>showToast("Logout failed: "+err.message,"error"));
+}
 
-const scanner = new QrScanner(scannerElem, async result => {
-    try {
-        const data = JSON.parse(result);
+// ---------- CAMERA & SCANNER ----------
+let html5QrScanner = null, cameras=[];
+Html5Qrcode.getCameras().then(camList=>{
+  cameras=camList;
+  const select = document.getElementById('camera-select');
+  select.innerHTML="";
+  cameras.forEach((cam,idx)=>{
+    const option = document.createElement('option');
+    option.value = cam.id;
+    option.text = cam.label || `Camera ${idx+1}`;
+    select.appendChild(option);
+  });
+}).catch(console.error);
 
-        qrInfoElem.style.display = "block";
-        infoText.innerHTML = `<strong>Vendor:</strong> ${data.vendor}<br>
-                              <strong>Material:</strong> ${data.material}<br>
-                              <strong>ID:</strong> ${data.id}<br>
-                              <strong>MFG Date:</strong> ${data.mfgDate}<br>
-                              <strong>Warranty:</strong> ${data.warranty} months`;
+window.startSelectedCamera = async function(){
+  const cameraId = document.getElementById('camera-select').value;
+  if(!cameraId){ showToast("No camera available!","error"); return; }
+  try{
+    if(html5QrScanner){ await html5QrScanner.stop(); html5QrScanner.clear(); }
+    html5QrScanner = new Html5Qrcode("reader");
+    html5QrScanner.start(
+      cameraId,
+      { fps:10, qrbox:250 },
+      onScanSuccess,
+      err => console.warn(err)
+    );
+  }catch(err){ showToast("Failed to start camera: "+err.message,"error"); }
+}
 
-        // Supply date logging
-        const supplyDate = new Date().toISOString().split('T')[0];
-        if(!data.vendorUID) data.vendorUID = data.vendorUID || prompt("Enter vendor UID manually for logging");
-        const qrRef = ref(db, `vendor_qrs/${data.vendorUID}/${data.id}`);
-        await update(qrRef, {supplyDate, inspectedBy: officerUID});
-        showToast(`QR Scanned! Supply date logged: ${supplyDate}`, "success");
+// ---------- QR SCAN HANDLER ----------
+function onScanSuccess(decodedText){
+  try{
+    const dataObj = JSON.parse(decodedText);
+    const qrId = dataObj.id || dataObj.ID || Math.random().toString(36).substring(2,8);
+    dataObj.ID = qrId;
+    set(ref(db,'inspection_qr/'+qrId), dataObj);
+    displayScanResult(dataObj);
+    showToast("QR scanned successfully","success");
+  }catch(e){
+    showToast("Invalid QR Code","error");
+  }
+}
 
-    } catch(e){
-        showToast("Invalid QR code", "error");
-    }
-}, {
-    highlightScanRegion: true,
-    highlightCodeOutline: true,
-    maxScansPerSecond: 2,
-    preferredCamera: 'environment',
-    video: { facingMode: "environment" }
-});
+function displayScanResult(data){
+  const div = document.getElementById('scan-result');
+  let tableHTML='<table>';
+  for(const key of ['ID','vendor','material','mfgDate','warranty']){
+    if(data[key]!==undefined) tableHTML += `<tr><th>${key}</th><td>${data[key]}</td></tr>`;
+  }
+  tableHTML+='</table>';
+  div.innerHTML = tableHTML;
+}
 
-// Start scanner
-scanner.start();
+// ---------- VIEW SCANNED QR MODAL ----------
+const modal = document.getElementById('scanned-modal');
+const modalClose = document.getElementById('modal-close');
+modalClose.onclick = ()=>modal.style.display="none";
+window.onclick = e => {if(e.target===modal) modal.style.display="none";}
+
+document.getElementById('btn-view-scanned').onclick = async ()=>{
+  modal.style.display="flex";
+  const listDiv = document.getElementById('scanned-list');
+  listDiv.innerHTML='Loading...';
+  const snap = await get(ref(db,'inspection_qr'));
+  if(snap.exists()){
+    const data = snap.val();
+    let html='<table><tr><th>ID</th><th>Material</th><th>Vendor</th><th>MFG Date</th><th>Warranty</th><th>QR</th></tr>';
+    Object.values(data).forEach(item=>{
+      html+=`<tr>
+        <td>${item.ID}</td>
+        <td>${item.material}</td>
+        <td>${item.vendor}</td>
+        <td>${item.mfgDate}</td>
+        <td>${item.warranty}</td>
+        <td><button onclick='showQRCodeModal(${JSON.stringify(item)})'>View QR</button></td>
+      </tr>`;
+    });
+    html+='</table>';
+    listDiv.innerHTML=html;
+  }else{ listDiv.innerHTML='No QR codes scanned yet.'; }
+}
+
+// ---------- QR VIEW POPUP ----------
+function showQRCodeModal(item){
+  const qrModal = document.createElement('div');
+  qrModal.className='modal';
+  qrModal.style.display='flex';
+  qrModal.innerHTML=`
+    <div class="modal-content">
+      <span class="modal-close" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
+      <h3>QR Info</h3>
+      <canvas id="qr-view"></canvas>
+      <p>ID: ${item.ID}<br>Vendor: ${item.vendor}<br>Material: ${item.material}<br>MFG Date: ${item.mfgDate}<br>Warranty: ${item.warranty} months</p>
+      <button id="download-qr">Download QR</button>
+    </div>
+  `;
+  document.body.appendChild(qrModal);
+  QRCode.toCanvas(qrModal.querySelector('#qr-view'), JSON.stringify(item), {width:200});
+  qrModal.querySelector('#download-qr').onclick=()=>{
+    const link = document.createElement('a');
+    link.href = qrModal.querySelector('#qr-view').toDataURL("image/png");
+    link.download = item.ID+".png";
+    link.click();
+  }
+}
+
 </script>
-
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 </body>
 </html>
