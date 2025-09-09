@@ -5,20 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LaserQR — Inspection Officer Dashboard</title>
 <style>
-body{font-family:Inter,ui-sans-serif,system-ui;background:#f8f8f8;margin:0;padding:0;}
+body, html{margin:0;padding:0;height:100%;font-family:Inter,ui-sans-serif,system-ui;background:#f8f8f8;}
 nav{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#ff8c00;color:white;}
 nav h2{margin:0;font-size:20px;}
 nav .team-name{font-weight:400;font-size:16px;}
-.container{max-width:900px;margin:20px auto;background:#fff;padding:24px;border-radius:16px;box-shadow:0 8px 25px rgba(0,0,0,0.1);}
-h1{color:#ff8c00;}
-label{display:block;margin-top:12px;font-weight:600;}
+.container{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:60px;box-sizing:border-box;}
+h1{color:#ff8c00;margin-bottom:10px;}
 button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none;padding:10px;width:100%;border-radius:8px;margin-top:10px;}
 .toast{position:fixed;top:20px;right:-350px;padding:14px 18px;background:#fff;border-left:6px solid #ff8c00;box-shadow:0 8px 20px rgba(0,0,0,0.15);border-radius:12px;font-size:14px;color:#333;transition:all 0.5s ease;z-index:9999;}
 .toast.show{right:20px;}
 .toast.success{border-left-color:green;}
 .toast.error{border-left-color:red;}
-#scanner{width:100%;height:300px;border-radius:12px;background:#000;}
-.qr-info{margin-top:20px;background:#f8f8f8;padding:12px;border-radius:10px;border:1px solid #ccc;}
+#scanner{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:-1;}
+.qr-info{position:relative;z-index:10;margin-top:20px;background:rgba(255,255,255,0.9);padding:12px;border-radius:10px;border:1px solid #ccc;max-width:400px;}
 </style>
 </head>
 <body>
@@ -32,10 +31,9 @@ button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none
 
 <div class="container">
 <h1>Inspection Officer Dashboard</h1>
-
 <p>Scan QR Codes of Track Fittings supplied by vendors:</p>
 
-<!-- QR Scanner -->
+<!-- QR Scanner Video -->
 <video id="scanner"></video>
 
 <!-- QR Info Display -->
@@ -47,7 +45,6 @@ button{cursor:pointer;background:#ff8c00;color:white;font-weight:600;border:none
 
 <div id="toast" class="toast"></div>
 
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
@@ -66,6 +63,7 @@ const firebaseConfig = {
   appId: "1:191584527271:web:71dad945fa1b18c0024c82",
   measurementId: "G-88ZMKEZT24"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
@@ -85,7 +83,7 @@ onAuthStateChanged(auth, user => {
   else window.location.href = "index.html";
 });
 
-// QR Scanner
+// Scanner
 const scannerElem = document.getElementById("scanner");
 const qrInfoElem = document.getElementById("qr-info");
 const infoText = document.getElementById("info-text");
@@ -93,6 +91,7 @@ const infoText = document.getElementById("info-text");
 const scanner = new QrScanner(scannerElem, async result => {
     try {
         const data = JSON.parse(result);
+
         qrInfoElem.style.display = "block";
         infoText.innerHTML = `<strong>Vendor:</strong> ${data.vendor}<br>
                               <strong>Material:</strong> ${data.material}<br>
@@ -102,10 +101,7 @@ const scanner = new QrScanner(scannerElem, async result => {
 
         // Supply date logging
         const supplyDate = new Date().toISOString().split('T')[0];
-        if(!data.vendorUID){
-          showToast("QR missing vendorUID, cannot log supply date", "error");
-          return;
-        }
+        if(!data.vendorUID) data.vendorUID = data.vendorUID || prompt("Enter vendor UID manually for logging");
         const qrRef = ref(db, `vendor_qrs/${data.vendorUID}/${data.id}`);
         await update(qrRef, {supplyDate, inspectedBy: officerUID});
         showToast(`QR Scanned! Supply date logged: ${supplyDate}`, "success");
@@ -113,8 +109,15 @@ const scanner = new QrScanner(scannerElem, async result => {
     } catch(e){
         showToast("Invalid QR code", "error");
     }
-}, {preferredCamera: 'environment'});
+}, {
+    highlightScanRegion: true,
+    highlightCodeOutline: true,
+    maxScansPerSecond: 2,
+    preferredCamera: 'environment',
+    video: { facingMode: "environment" }
+});
 
+// Start scanner
 scanner.start();
 </script>
 
